@@ -1,0 +1,596 @@
+---
+---
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Expense Tracker</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --card: #1e1e1e;
+    --border: #2a2a2a;
+    --accent: #e8ff47;
+    --accent2: #ff6b35;
+    --text: #f0f0f0;
+    --muted: #666;
+    --red: #f87171;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Mono', monospace;
+    min-height: 100vh;
+    padding: 2rem 1rem;
+  }
+
+  .grain {
+    position: fixed; inset: 0; pointer-events: none; z-index: 100;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    opacity: 0.4;
+  }
+
+  .container { max-width: 760px; margin: 0 auto; position: relative; z-index: 1; }
+
+  /* ── Header ── */
+  header {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    margin-bottom: 2.5rem; padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .logo { font-family: 'Syne', sans-serif; font-size: 2.2rem; font-weight: 800; line-height: 1; letter-spacing: -0.04em; }
+  .logo span { color: var(--accent); }
+  .month-label { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.15em; }
+
+  /* ── Summary strip ── */
+  .summary {
+    display: grid; grid-template-columns: 1fr 1fr 1fr;
+    gap: 1px; background: var(--border);
+    border: 1px solid var(--border); border-radius: 12px;
+    overflow: hidden; margin-bottom: 2rem;
+  }
+  .summary-card { background: var(--card); padding: 1.2rem 1.4rem; display: flex; flex-direction: column; gap: 0.3rem; }
+  .summary-card .label { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; }
+  .summary-card .value { font-family: 'Syne', sans-serif; font-size: 1.5rem; font-weight: 700; letter-spacing: -0.02em; }
+  .summary-card.total .value { color: var(--accent); }
+  .summary-card.count .value { color: var(--text); }
+  .summary-card.avg   .value { color: var(--accent2); }
+
+  /* ── Add form ── */
+  .add-form { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; margin-bottom: 2rem; }
+  .form-title { font-family: 'Syne', sans-serif; font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 1.2rem; }
+  .form-row { display: grid; grid-template-columns: 1fr auto auto auto; gap: 0.6rem; align-items: end; }
+  .input-group { display: flex; flex-direction: column; gap: 0.3rem; }
+  .input-group label { font-size: 0.6rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+
+  input, select {
+    background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); font-family: 'DM Mono', monospace; font-size: 0.85rem;
+    padding: 0.6rem 0.9rem; outline: none; transition: border-color 0.15s; width: 100%;
+  }
+  input:focus, select:focus { border-color: var(--accent); }
+  input[type="number"] { max-width: 130px; }
+  select { max-width: 150px; cursor: pointer; }
+  select option { background: #1e1e1e; }
+
+  .btn-add {
+    background: var(--accent); color: #0d0d0d; border: none; border-radius: 8px;
+    font-family: 'Syne', sans-serif; font-size: 0.85rem; font-weight: 700;
+    padding: 0.6rem 1.4rem; cursor: pointer; white-space: nowrap;
+    transition: transform 0.1s, opacity 0.15s;
+  }
+  .btn-add:hover { opacity: 0.85; transform: translateY(-1px); }
+  .btn-add:active { transform: scale(0.97); }
+
+  /* ── Filter chips ── */
+  .filter-bar { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.2rem; align-items: center; }
+  .filter-bar span { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; margin-right: 0.3rem; }
+  .chip {
+    background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+    color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.7rem;
+    padding: 0.3rem 0.8rem; cursor: pointer; transition: all 0.15s;
+  }
+  .chip.active, .chip:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── Expense list ── */
+  .expense-list { display: flex; flex-direction: column; gap: 0.5rem; }
+  .expense-item {
+    background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+    padding: 0.9rem 1.2rem; display: flex; align-items: center; gap: 1rem;
+    animation: slideIn 0.2s ease; transition: border-color 0.15s;
+  }
+  .expense-item:hover { border-color: #3a3a3a; }
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(-8px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .cat-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .expense-name { flex: 1; font-size: 0.85rem; color: var(--text); }
+  .expense-cat  { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
+  .expense-date { font-size: 0.7rem; color: var(--muted); }
+  .expense-amount { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; color: var(--red); }
+  .btn-del {
+    background: none; border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); font-size: 0.7rem; padding: 0.25rem 0.5rem;
+    cursor: pointer; transition: all 0.15s; flex-shrink: 0;
+  }
+  .btn-del:hover { border-color: var(--red); color: var(--red); }
+  .empty { text-align: center; color: var(--muted); font-size: 0.8rem; padding: 3rem 1rem; border: 1px dashed var(--border); border-radius: 12px; }
+
+  /* ── Category breakdown bars ── */
+  .breakdown { margin-top: 2rem; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.5rem; }
+  .breakdown-title { font-family: 'Syne', sans-serif; font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 1.2rem; }
+  .bar-row { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 0.7rem; }
+  .bar-label { font-size: 0.7rem; color: var(--text); width: 90px; flex-shrink: 0; text-transform: capitalize; }
+  .bar-track { flex: 1; height: 6px; background: var(--border); border-radius: 99px; overflow: hidden; }
+  .bar-fill  { height: 100%; border-radius: 99px; transition: width 0.4s ease; }
+  .bar-val   { font-family: 'Syne', sans-serif; font-size: 0.8rem; font-weight: 600; color: var(--text); min-width: 80px; text-align: right; }
+
+  /* ── Charts section ── */
+  .charts-section { margin-top: 2rem; display: none; flex-direction: column; gap: 1.5rem; }
+  .charts-section.visible { display: flex; }
+  .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 0.2rem; }
+  .section-title  { font-family: 'Syne', sans-serif; font-size: 0.8rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.15em; }
+  .chart-tabs { display: flex; gap: 0.4rem; }
+  .chart-tab {
+    background: var(--card); border: 1px solid var(--border); border-radius: 6px;
+    color: var(--muted); font-family: 'DM Mono', monospace; font-size: 0.65rem;
+    padding: 0.25rem 0.65rem; cursor: pointer; transition: all 0.15s;
+  }
+  .chart-tab.active, .chart-tab:hover { border-color: var(--accent); color: var(--accent); }
+  .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+  .chart-card  { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 1.4rem; }
+  .chart-card.wide { grid-column: 1 / -1; }
+  .chart-card-title { font-size: 0.65rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.12em; margin-bottom: 1.2rem; }
+  .chart-wrap { position: relative; width: 100%; }
+  .donut-center { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; pointer-events: none; }
+  .donut-center .dc-val { font-family: 'Syne', sans-serif; font-size: 1rem; font-weight: 700; color: var(--accent); line-height: 1; }
+  .donut-center .dc-lbl { font-size: 0.55rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.1em; }
+  .chart-legend { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; margin-top: 1rem; }
+  .legend-item  { display: flex; align-items: center; gap: 0.4rem; font-size: 0.65rem; color: var(--text); text-transform: capitalize; }
+  .legend-dot   { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Mobile ── */
+  @media (max-width: 600px) {
+    .form-row { grid-template-columns: 1fr 1fr; }
+    .btn-add  { grid-column: 1 / -1; }
+    input[type="number"], select { max-width: 100%; }
+    .summary { grid-template-columns: 1fr; }
+    .charts-grid { grid-template-columns: 1fr; }
+    .chart-card.wide { grid-column: 1; }
+  }
+</style>
+</head>
+<body>
+<div class="grain"></div>
+<div class="container">
+
+  <header>
+    <div class="logo">EX<span>&#8377;</span>NSE</div>
+    <div class="month-label" id="currentMonth"></div>
+  </header>
+
+  <div class="summary">
+    <div class="summary-card total">
+      <div class="label">Total Spent</div>
+      <div class="value" id="totalSpent">0.00</div>
+    </div>
+    <div class="summary-card count">
+      <div class="label">Entries</div>
+      <div class="value" id="entryCount">0</div>
+    </div>
+    <div class="summary-card avg">
+      <div class="label">Average</div>
+      <div class="value" id="avgAmount">0.00</div>
+    </div>
+  </div>
+
+  <div class="add-form">
+    <div class="form-title">+ Add Expense</div>
+    <div class="form-row">
+      <div class="input-group" style="min-width:0">
+        <label>Description</label>
+        <input type="text" id="expenseName" placeholder="e.g. Groceries" />
+      </div>
+      <div class="input-group">
+        <label>Amount (LKR)</label>
+        <input type="number" id="expenseAmount" placeholder="0.00" min="0" step="0.01" />
+      </div>
+      <div class="input-group">
+        <label>Category</label>
+        <select id="expenseCat">
+          <option value="food">Food</option>
+          <option value="transport">Transport</option>
+          <option value="shopping">Shopping</option>
+          <option value="health">Health</option>
+          <option value="bills">Bills</option>
+          <option value="entertainment">Entertainment</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <button class="btn-add" onclick="addExpense()">Add</button>
+    </div>
+  </div>
+
+  <div class="filter-bar">
+    <span>Filter:</span>
+    <div class="chip active"  onclick="setFilter('all', this)">All</div>
+    <div class="chip" onclick="setFilter('food', this)">Food</div>
+    <div class="chip" onclick="setFilter('transport', this)">Transport</div>
+    <div class="chip" onclick="setFilter('shopping', this)">Shopping</div>
+    <div class="chip" onclick="setFilter('health', this)">Health</div>
+    <div class="chip" onclick="setFilter('bills', this)">Bills</div>
+    <div class="chip" onclick="setFilter('entertainment', this)">Entertainment</div>
+    <div class="chip" onclick="setFilter('other', this)">Other</div>
+  </div>
+
+  <div class="expense-list" id="expenseList"></div>
+
+  <div class="breakdown" id="breakdown" style="display:none">
+    <div class="breakdown-title">Breakdown by Category</div>
+    <div id="breakdownBars"></div>
+  </div>
+
+  <div class="charts-section" id="chartsSection">
+    <div class="section-header">
+      <div class="section-title">Data Visualisation</div>
+      <div class="chart-tabs">
+        <div class="chart-tab active" id="tabAll"    onclick="switchChartView('all')">All Time</div>
+        <div class="chart-tab"        id="tabRecent" onclick="switchChartView('recent')">Last 7</div>
+      </div>
+    </div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-card-title">Spending by Category</div>
+        <div class="chart-wrap" style="height:200px">
+          <canvas id="donutChart"></canvas>
+          <div class="donut-center">
+            <div class="dc-val" id="donutTotal">-</div>
+            <div class="dc-lbl">total</div>
+          </div>
+        </div>
+        <div class="chart-legend" id="donutLegend"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-card-title">Amount per Category</div>
+        <div class="chart-wrap" style="height:200px">
+          <canvas id="barCatChart"></canvas>
+        </div>
+      </div>
+      <div class="chart-card wide">
+        <div class="chart-card-title">Spending Over Time</div>
+        <div class="chart-wrap" style="height:180px">
+          <canvas id="timelineChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // ── Constants ──────────────────────────────────────────────
+  var CAT_COLORS = {
+    food:          '#ff6b35',
+    transport:     '#4ade80',
+    shopping:      '#e8ff47',
+    health:        '#f472b6',
+    bills:         '#60a5fa',
+    entertainment: '#a78bfa',
+    other:         '#94a3b8'
+  };
+
+  // ── State ──────────────────────────────────────────────────
+  var expenses     = JSON.parse(localStorage.getItem('expenses_v1') || '[]');
+  var activeFilter = 'all';
+  var chartView    = 'all';
+  var donutChart, barCatChart, timelineChart;
+
+  // ── Helpers ────────────────────────────────────────────────
+  function save() {
+    localStorage.setItem('expenses_v1', JSON.stringify(expenses));
+  }
+
+  function fmt(n) {
+    return n.toLocaleString('en-LK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
+
+  function todayStr() {
+    return new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
+  }
+
+  // ── Add expense ────────────────────────────────────────────
+  window.addExpense = function () {
+    var nameEl   = document.getElementById('expenseName');
+    var amountEl = document.getElementById('expenseAmount');
+    var catEl    = document.getElementById('expenseCat');
+
+    var name   = nameEl.value.trim();
+    var amount = parseFloat(amountEl.value);
+    var cat    = catEl.value;
+
+    if (!name || isNaN(amount) || amount <= 0) {
+      nameEl.focus();
+      return;
+    }
+
+    expenses.unshift({ id: Date.now(), name: name, amount: amount, cat: cat, date: todayStr() });
+    save();
+    nameEl.value   = '';
+    amountEl.value = '';
+    nameEl.focus();
+    render();
+    renderCharts();
+  };
+
+  // ── Delete expense ─────────────────────────────────────────
+  window.deleteExpense = function (id) {
+    expenses = expenses.filter(function (e) { return e.id !== id; });
+    save();
+    render();
+    renderCharts();
+  };
+
+  // ── Filter ─────────────────────────────────────────────────
+  window.setFilter = function (cat, el) {
+    activeFilter = cat;
+    var chips = document.querySelectorAll('.chip');
+    for (var i = 0; i < chips.length; i++) { chips[i].classList.remove('active'); }
+    el.classList.add('active');
+    render();
+    renderCharts();
+  };
+
+  // ── Main render ────────────────────────────────────────────
+  function render() {
+    var filtered = activeFilter === 'all'
+      ? expenses
+      : expenses.filter(function (e) { return e.cat === activeFilter; });
+
+    var total = expenses.reduce(function (s, e) { return s + e.amount; }, 0);
+    var avg   = expenses.length ? total / expenses.length : 0;
+
+    document.getElementById('totalSpent').textContent = fmt(total);
+    document.getElementById('entryCount').textContent = expenses.length;
+    document.getElementById('avgAmount').textContent  = fmt(avg);
+
+    var list = document.getElementById('expenseList');
+
+    if (filtered.length === 0) {
+      list.innerHTML = '<div class="empty">No expenses yet'
+        + (activeFilter !== 'all' ? ' in this category' : '')
+        + '.<br>Add one above &uarr;</div>';
+    } else {
+      list.innerHTML = filtered.map(function (e) {
+        return '<div class="expense-item">'
+          + '<div class="cat-dot" style="background:' + CAT_COLORS[e.cat] + '"></div>'
+          + '<div style="flex:1;min-width:0">'
+          +   '<div class="expense-name">' + escHtml(e.name) + '</div>'
+          +   '<div class="expense-cat">'  + e.cat + '</div>'
+          + '</div>'
+          + '<div class="expense-date">'    + e.date + '</div>'
+          + '<div class="expense-amount">&minus; ' + fmt(e.amount) + '</div>'
+          + '<button class="btn-del" onclick="deleteExpense(' + e.id + ')">&times;</button>'
+          + '</div>';
+      }).join('');
+    }
+
+    renderBreakdown(total);
+  }
+
+  // Prevent XSS from user-entered names
+  function escHtml(str) {
+    return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  // ── Breakdown bars ─────────────────────────────────────────
+  function renderBreakdown(total) {
+    var bd   = document.getElementById('breakdown');
+    var bars = document.getElementById('breakdownBars');
+
+    if (expenses.length === 0) { bd.style.display = 'none'; return; }
+    bd.style.display = 'block';
+
+    var cats = {};
+    expenses.forEach(function (e) { cats[e.cat] = (cats[e.cat] || 0) + e.amount; });
+    var sorted = Object.entries(cats).sort(function (a, b) { return b[1] - a[1]; });
+    var max = sorted[0][1];
+
+    bars.innerHTML = sorted.map(function (pair) {
+      var cat = pair[0], amt = pair[1];
+      return '<div class="bar-row">'
+        + '<div class="bar-label">' + cat + '</div>'
+        + '<div class="bar-track"><div class="bar-fill" style="width:' + (amt / max * 100).toFixed(1) + '%;background:' + CAT_COLORS[cat] + '"></div></div>'
+        + '<div class="bar-val">' + fmt(amt) + '</div>'
+        + '</div>';
+    }).join('');
+  }
+
+  // ── Chart helpers ──────────────────────────────────────────
+  window.switchChartView = function (v) {
+    chartView = v;
+    document.getElementById('tabAll').classList.toggle('active', v === 'all');
+    document.getElementById('tabRecent').classList.toggle('active', v === 'recent');
+    renderCharts();
+  };
+
+  function getChartData() {
+    if (chartView === 'all') return expenses;
+    return expenses.slice().sort(function (a, b) { return b.id - a.id; }).slice(0, 7);
+  }
+
+  function makeTip(extraCallbacks) {
+    var tip = {
+      backgroundColor: '#1e1e1e',
+      borderColor:     '#2a2a2a',
+      borderWidth:     1,
+      titleColor:      '#f0f0f0',
+      bodyColor:       '#999',
+      titleFont:       { family: 'Syne',    size: 11 },
+      bodyFont:        { family: 'DM Mono', size: 10 },
+      padding:         10
+    };
+    if (extraCallbacks) tip.callbacks = extraCallbacks;
+    return tip;
+  }
+
+  function makeScales() {
+    return {
+      x: {
+        grid:  { color: '#2a2a2a' },
+        ticks: { color: '#666', font: { family: 'DM Mono', size: 9 } }
+      },
+      y: {
+        grid:   { color: '#2a2a2a' },
+        border: { dash: [4, 4] },
+        ticks:  {
+          color: '#666',
+          font:  { family: 'DM Mono', size: 9 },
+          callback: function (v) { return v >= 1000 ? (v / 1000).toFixed(0) + 'k' : v; }
+        }
+      }
+    };
+  }
+
+  // ── Charts render ──────────────────────────────────────────
+  function renderCharts() {
+    var sec = document.getElementById('chartsSection');
+    if (expenses.length === 0) { sec.classList.remove('visible'); return; }
+    sec.classList.add('visible');
+
+    var data = getChartData();
+
+    // Category totals
+    var cats = {};
+    data.forEach(function (e) { cats[e.cat] = (cats[e.cat] || 0) + e.amount; });
+    var catLabels = Object.keys(cats);
+    var catVals   = catLabels.map(function (c) { return cats[c]; });
+    var catColors = catLabels.map(function (c) { return CAT_COLORS[c]; });
+    var total     = catVals.reduce(function (s, v) { return s + v; }, 0);
+
+    document.getElementById('donutTotal').textContent = fmt(total);
+
+    // Donut
+    if (donutChart) donutChart.destroy();
+    donutChart = new Chart(document.getElementById('donutChart'), {
+      type: 'doughnut',
+      data: {
+        labels: catLabels,
+        datasets: [{
+          data:            catVals,
+          backgroundColor: catColors,
+          borderColor:     '#0d0d0d',
+          borderWidth:     3,
+          hoverOffset:     6
+        }]
+      },
+      options: {
+        cutout: '68%',
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        plugins: {
+          legend: { display: false },
+          tooltip: makeTip({
+            label: function (ctx) { return '  ' + ctx.label + ': LKR ' + fmt(ctx.parsed); }
+          })
+        }
+      }
+    });
+
+    document.getElementById('donutLegend').innerHTML = catLabels.map(function (c, i) {
+      return '<div class="legend-item"><div class="legend-dot" style="background:' + catColors[i] + '"></div>' + c + '</div>';
+    }).join('');
+
+    // Bar by category
+    if (barCatChart) barCatChart.destroy();
+    barCatChart = new Chart(document.getElementById('barCatChart'), {
+      type: 'bar',
+      data: {
+        labels: catLabels.map(function (c) { return c.charAt(0).toUpperCase() + c.slice(1); }),
+        datasets: [{
+          data:            catVals,
+          backgroundColor: catColors.map(function (c) { return c + 'cc'; }),
+          borderColor:     catColors,
+          borderWidth:     2,
+          borderRadius:    6,
+          borderSkipped:   false
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        plugins: {
+          legend:  { display: false },
+          tooltip: makeTip({ label: function (ctx) { return '  LKR ' + fmt(ctx.parsed.y); } })
+        },
+        scales: makeScales()
+      }
+    });
+
+    // Timeline — group by date in chronological order
+    var dateOrder = [];
+    var byDate    = {};
+    var reversed  = data.slice().reverse();
+    reversed.forEach(function (e) {
+      if (!Object.prototype.hasOwnProperty.call(byDate, e.date)) {
+        dateOrder.push(e.date);
+        byDate[e.date] = 0;
+      }
+      byDate[e.date] += e.amount;
+    });
+
+    if (timelineChart) timelineChart.destroy();
+    timelineChart = new Chart(document.getElementById('timelineChart'), {
+      type: 'bar',
+      data: {
+        labels: dateOrder,
+        datasets: [{
+          label:           'Spending',
+          data:            dateOrder.map(function (d) { return byDate[d]; }),
+          backgroundColor: '#e8ff4733',
+          borderColor:     '#e8ff47',
+          borderWidth:     2,
+          borderRadius:    5,
+          borderSkipped:   false
+        }]
+      },
+      options: {
+        maintainAspectRatio: false,
+        animation: { duration: 400 },
+        plugins: {
+          legend:  { display: false },
+          tooltip: makeTip({ label: function (ctx) { return '  LKR ' + fmt(ctx.parsed.y); } })
+        },
+        scales: makeScales()
+      }
+    });
+  }
+
+  // ── Init ───────────────────────────────────────────────────
+  document.getElementById('currentMonth').textContent =
+    new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
+  document.getElementById('expenseName').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') document.getElementById('expenseAmount').focus();
+  });
+  document.getElementById('expenseAmount').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') window.addExpense();
+  });
+
+  render();
+  renderCharts();
+
+})();
+</script>
+</body>
+</html>
